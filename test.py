@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import requests
 import json
 from mangum import Mangum
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from typing import Optional,Dict
@@ -65,7 +66,7 @@ class IPNURL():
             change in the order and the hmacs wouldn't match
         """
         encoded = urllib.parse.urlencode(params).encode('utf-8')
-       # return encoded, hmac.new(bytearray(self.ipn_id, 'utf-8'), encoded, hashlib.sha512).hexdigest()
+        return encoded, hmac.new(bytearray(self.ipn_id, 'utf-8'), encoded, hashlib.sha512).hexdigest()
 
     def Request(self, request_method, **params):
         """ The basic request that all API calls use
@@ -278,7 +279,12 @@ def Seatmap_USD(Seatmap):
 
 
 
-
+def create_access_token(data: dict):
+    SECRET_KEY = os.getenv("FA_KEY")
+    # You should implement your token creation here
+    # This is just an illustrative example.
+    token = jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
+    return token
 
 def authenticate_user(email: str, password: str):
     cnx = mysql.connector.connect(
@@ -303,10 +309,70 @@ def authenticate_user(email: str, password: str):
 
     return user
 
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Could not validate credentials",
+    headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+        token_data = TokenData(email=email)
+    except JWTError:
+        raise credentials_exception
+    return token_data
 
 
 
 
+@app.post("/Create User")
+def create_user(email: str, password: str):
+    # Hash the password
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+    # Establish a connection to MySQL
+    cnx = mysql.connector.connect(
+        host="127.0.0.1",
+        user="root",
+        password="",
+        database="users"
+    )
+
+    cursor = cnx.cursor()
+
+    # Insert the user into the 'users' table
+    cursor.execute('''
+        INSERT INTO credentials (email, password) VALUES (%s, %s)
+    ''', (email, hashed.decode('utf-8')))
+
+    cnx.commit()
+
+    # Close the connection
+    cnx.close()
+    return {"result": "Account Created"}
+
+
+@app.post("/Login token", response_model=Token)
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(data={"sub": user['email']})
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+
+@app.get("/users/me")
+async def read_users_me(current_user: TokenData = Depends(get_current_user)):
+    return current_user
 
 
 # Load the airport JSON data
@@ -365,10 +431,7 @@ def OnewaySearch(cabinclass:str,adults:int,childs:int,infants:int,source:str,des
         }
         })
     url = "https://apitest.tripjack.com/fms/v1/air-search-all"
-    headers = {'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin':'*',
-    'Access-Control-Allow-Headers':'Content-Type,Authorization',
-    'Access-Control-Allow-Methods':'*','apikey': TJ_KEY}
+    headers = {'Content-Type': 'application/json','apikey': TJ_KEY}
     final = requests.request("POST", url, headers=headers, data=payload)
     if final.ok:
         res = final.json()
@@ -437,10 +500,7 @@ def ReturnSearch(cabinclass:str,adults:int,childs:int,infants:int,source:str,des
         }
         })
     url = "https://apitest.tripjack.com/fms/v1/air-search-all"
-    headers = {'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin':'*',
-    'Access-Control-Allow-Headers':'Content-Type,Authorization',
-    'Access-Control-Allow-Methods':'*','apikey': TJ_KEY}
+    headers = {'Content-Type': 'application/json','apikey': TJ_KEY}
     final = requests.request("POST", url, headers=headers, data=payload)
     if final.ok:
         res = final.json()
