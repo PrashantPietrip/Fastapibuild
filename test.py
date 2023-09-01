@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import requests
 import json
 from mangum import Mangum
-from jose import jwt, JWTError
+import python_jwt as jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from typing import Optional,Dict
