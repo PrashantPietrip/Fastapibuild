@@ -365,7 +365,10 @@ def OnewaySearch(cabinclass:str,adults:int,childs:int,infants:int,source:str,des
         }
         })
     url = "https://apitest.tripjack.com/fms/v1/air-search-all"
-    headers = {'Content-Type': 'application/json','apikey': TJ_KEY}
+    headers = {'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin':'*',
+    'Access-Control-Allow-Headers':'Content-Type,Authorization',
+    'Access-Control-Allow-Methods':'*','apikey': TJ_KEY}
     final = requests.request("POST", url, headers=headers, data=payload)
     if final.ok:
         res = final.json()
@@ -434,7 +437,10 @@ def ReturnSearch(cabinclass:str,adults:int,childs:int,infants:int,source:str,des
         }
         })
     url = "https://apitest.tripjack.com/fms/v1/air-search-all"
-    headers = {'Content-Type': 'application/json','apikey': TJ_KEY}
+    headers = {'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin':'*',
+    'Access-Control-Allow-Headers':'Content-Type,Authorization',
+    'Access-Control-Allow-Methods':'*','apikey': TJ_KEY}
     final = requests.request("POST", url, headers=headers, data=payload)
     if final.ok:
         res = final.json()
